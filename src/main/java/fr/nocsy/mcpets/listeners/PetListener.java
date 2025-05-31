@@ -1,5 +1,6 @@
 package fr.nocsy.mcpets.listeners;
 
+import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import com.ticxo.modelengine.api.events.ModelDismountEvent;
 import com.ticxo.modelengine.api.events.ModelMountEvent;
 import fr.nocsy.mcpets.MCPets;
@@ -30,17 +31,25 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.EntityTameEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class PetListener implements Listener {
 
     private final HashMap<UUID, String> reconnectionPets = new HashMap<>();
+    private final Map<UUID, Long> lastInteractions = new HashMap<>();
+
+    @EventHandler
+    public void onDespawn(EntityRemoveFromWorldEvent event) {
+        lastInteractions.remove(event.getEntity().getUniqueId());
+    }
 
     @EventHandler
     public void interact(PlayerInteractEntityEvent e) {
@@ -73,7 +82,14 @@ public class PetListener implements Listener {
             PetOwnerInteractEvent event = new PetOwnerInteractEvent(pet);
             Utils.callEvent(event);
             if (event.isCancelled()) return;
+            if (
+                    lastInteractions.containsKey(ent.getUniqueId())
+                            && lastInteractions.get(ent.getUniqueId()) + 1000L > System.currentTimeMillis()
+            ) {
+                return;
+            }
 
+            lastInteractions.put(ent.getUniqueId(), System.currentTimeMillis());
             PetInteractionMenu menu = new PetInteractionMenu(pet, p.getUniqueId());
             pet.setLastInteractedWith(p);
             menu.open(p);
@@ -104,6 +120,16 @@ public class PetListener implements Listener {
 
         if (pet != null && pet.getOwner() != null &&
                 pet.getOwner().equals(p.getUniqueId())) {
+
+            if (
+                    lastInteractions.containsKey(ent.getUniqueId())
+                            && lastInteractions.get(ent.getUniqueId()) + 1000L > System.currentTimeMillis()
+            ) {
+                return;
+            }
+
+            lastInteractions.put(ent.getUniqueId(), System.currentTimeMillis());
+
             PetInteractionMenu menu = new PetInteractionMenu(pet, p.getUniqueId());
             pet.setLastInteractedWith(p);
             menu.open(p);
